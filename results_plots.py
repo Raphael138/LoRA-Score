@@ -1,206 +1,136 @@
-import argparse
-from matplotlib import pyplot as plt
-from tqdm import tqdm
-import torch
+import matplotlib.pyplot as plt
 import numpy as np
-import os
-from scipy.stats import linregress
+from collections import defaultdict
 
-def plot_metrics(data):
-    """Given the dictionary of the results -> Plot the results"""
-    # Create the figure and subplots
-    fig, axes = plt.subplots(1, 2, figsize=(11, 5))
+import matplotlib.pyplot as plt
+import numpy as np
+from collections import defaultdict
 
-    # Plot training and validation loss
-    axes[0].plot(data["Step"], data["Training Loss"], label="Training Loss", marker="o", color="blue")
-    axes[0].plot(data["Step"], data["Validation Loss"], label="Validation Loss", marker="o", color="orange")
-    axes[0].set_title("Loss Curves")
-    axes[0].set_xlabel("Steps")
-    axes[0].set_ylabel("Loss")
-    axes[0].legend()
-    axes[0].grid(True)
+# def plot_coefficients_over_runs(
+#     results, 
+#     coefficient_name, 
+#     x_axis="num_classes", 
+#     layers=None, 
+#     matrix_types=None, 
+#     combine_runs=True, 
+#     combine_layers=False,
+#     filter_runs=None, 
+#     title=None
+# ):
+#     """
+#     Plot intrinsic dimensionality coefficients (gini, elbow, energy) over runs.
 
-    # Plot validation accuracy
-    axes[1].plot(data["Step"], data["Validation Accuracy"], label="Validation Accuracy", marker="o", color="green")
-    axes[1].set_title("Validation Accuracy Curve")
-    axes[1].set_xlabel("Steps")
-    axes[1].set_ylabel("Accuracy")
-    axes[1].legend()
-    axes[1].grid(True)
+#     Args:
+#         results (dict): Dictionary containing training run results.
+#         coefficient_name (str): One of "gini", "elbow", or "energy".
+#         x_axis (str): X-axis value, either "num_classes" or "best_accuracy".
+#         layers (list, optional): List of layers to include. Defaults to all layers.
+#         matrix_types (list, optional): List of matrix types to include. Defaults to ["query", "key", "value"].
+#         combine_runs (bool): Whether to average values for runs with the same x-axis value.
+#         combine_layers (bool): Whether to average values across all layers for each matrix type.
+#         filter_runs (list, optional): List of run names to include. Defaults to all runs.
+#         title (str, optional): Custom title for the plot.
 
-    # Adjust layout and display
-    plt.tight_layout()
-    return plt.show()
+#     Example Usage:
+#         # Plot gini coefficients averaged over layers
+#         plot_coefficients_over_runs(results, "gini", combine_layers=True)
 
-def plot_lora_svd_singular_values(svd_results):
-    """
-    Plot singular values, with the x-axis as the index and y-axis as the value of the singular value.
-    One row per layer, columns for matrix types.
-    """
-    num_layers = len(svd_results)
-    matrix_types = ['query', 'key', 'value']
-    
-    # Create figure with one row per layer
-    fig, axes = plt.subplots(num_layers, 3, figsize=(15, 4*num_layers))
-    fig.suptitle('Singular Values in LoRA Weights', fontsize=16)
-    
-    for layer_idx, (layer_key, layer_data) in enumerate(svd_results.items()):
-        for matrix_idx, matrix_name in enumerate(matrix_types):
-            singular_values = layer_data[matrix_name]
-            
-            # Plot singular values
-            axes[layer_idx, matrix_idx].plot(range(len(singular_values)), singular_values, marker='o')
-            axes[layer_idx, matrix_idx].set_title(f'{layer_key} - {matrix_name} Matrix')
-            axes[layer_idx, matrix_idx].set_xlabel('Index')
-            axes[layer_idx, matrix_idx].set_ylabel('Singular Value')
-    
-    plt.tight_layout(rect=[0, 0.03, 1, 0.98])
-    plt.show()
+#         # Plot energy coefficients for specific layers and matrix types
+#         plot_coefficients_over_runs(results, "energy", x_axis="best_accuracy", layers=["layer_3"], matrix_types=["query"], filter_runs=["run_10", "run_20"])
+#     """
+#     # Initialize storage for x and y values
+#     combined_data = defaultdict(list)
 
-def plot_log_lora_svd_singular_values(svd_results):
-    """
-    Plot singular values, with the x-axis as the log index and y-axis as the value of the singular value.
-    One row per layer, columns for matrix types.
-    """
-    num_layers = len(svd_results)
-    matrix_types = ['query', 'key', 'value']
-    
-    # Create figure with one row per layer
-    fig, axes = plt.subplots(num_layers, 3, figsize=(15, 4*num_layers))
-    fig.suptitle('Singular Values in LoRA Weights', fontsize=16)
-    
-    for layer_idx, (layer_key, layer_data) in enumerate(svd_results.items()):
-        for matrix_idx, matrix_name in enumerate(matrix_types):
-            singular_values = np.log(layer_data[matrix_name])
-            
-            # Plot singular values
-            axes[layer_idx, matrix_idx].plot(range(len(singular_values)), singular_values, marker='o')
-            axes[layer_idx, matrix_idx].set_title(f'{layer_key} - {matrix_name} Matrix')
-            axes[layer_idx, matrix_idx].set_xlabel('Index')
-            axes[layer_idx, matrix_idx].set_ylabel('Singular Value')
-    
-    plt.tight_layout(rect=[0, 0.03, 1, 0.98])
-    plt.show()
+#     # Default title
+#     if not title:
+#         title = f"{coefficient_name.capitalize()} Coefficient over Runs"
 
+#     # Filter runs if specified
+#     filtered_results = {k: v for k, v in results.items() if not filter_runs or k in filter_runs}
 
-def plot_histogram(data, bins=10, title='Distribution Histogram', xlabel='Value', file_path=None):
-    """
-    Plot a histogram of floating-point values.
-    """
-    # Convert input to numpy array
-    data_array = np.array(data)
-    
-    # Create figure and axis
-    plt.figure(figsize=(8, 5))
-    
-    # Plot histogram
-    plt.hist(data_array, bins=bins, edgecolor="black")
-    
-    # Set labels and title
-    plt.title(title, fontsize=15)
-    plt.xlabel(xlabel, fontsize=12)
-    plt.ylabel("Frequency", fontsize=12)
-    
-    # Add grid for better readability
-    plt.grid(linestyle='--')
-    
-    # Compute and display some basic statistics
-    plt.annotate(f'Mean: {np.mean(data_array):.2f}\n'
-                 f'Median: {np.median(data_array):.2f}\n'
-                 f'Std Dev: {np.std(data_array):.2f}', 
-                 xy=(0.95, 0.95), xycoords='axes fraction', 
-                 horizontalalignment='right', 
-                 verticalalignment='top',
-                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.5))
-    
-    # Adjust layout
-    plt.tight_layout()
+#     for run, data in filtered_results.items():
+#         # X-axis value: Extract num_classes or best_accuracy
+#         if x_axis == "num_classes":
+#             try:
+#                 x_value = int(len(run.split('-')))  # Extract class count from the run name
+#             except ValueError:
+#                 print(f"Warning: Could not parse 'num_classes' for run '{run}'. Skipping.")
+#                 continue
+#         elif x_axis == "best_accuracy":
+#             x_value = data["Metrics"]["Best Results"]["Validation Accuracy"]
+#         else:
+#             raise ValueError("x_axis must be 'num_classes' or 'best_accuracy'")
 
-    if file_path:
-        if not os.path.exists(os.path.dirname(file_path)):
-            os.makedirs(os.path.dirname(file_path))
-        plt.savefig(file_path)
-    
-    return plt.show()
+#         # Collect coefficients
+#         coeffs = data["Coefficients"][coefficient_name]
+#         svd_entries = data["SVD Diagonal Entries"]
 
-def test_log_relationship(singular_values, layer_name, matrix_name):
-    """
-    Test if there is a logarithmic relationship between the index and singular values.
-    Plots the original and log-transformed relationships and computes a linear fit.
-    """
-    indices = np.arange(1, len(singular_values) + 1)  # Avoid log(0) by starting from 1
-    log_values = np.log(singular_values)
-    
-    # Fit a linear model in log space
-    slope, intercept, r_value, p_value, std_err = linregress(indices, log_values)
-    
-    # Plot the original data
-    plt.figure(figsize=(12, 6))
-    
-    # Original plot
-    plt.subplot(1, 2, 1)
-    plt.plot(indices, singular_values, marker='o', label='Original')
-    plt.title(f'Original Singular Values ({layer_name} - {matrix_name})')
-    plt.xlabel('Index')
-    plt.ylabel('Singular Value')
-    plt.grid(True)
-    plt.legend()
-    
-    # Log-transformed plot
-    plt.subplot(1, 2, 2)
-    plt.plot(indices, log_values, marker='o', label='Log-Transformed')
-    plt.plot(indices, intercept + slope * indices, label=f'Fit (r={r_value:.2f})', linestyle='--')
-    plt.title(f'Log Relationship ({layer_name} - {matrix_name})')
-    plt.xlabel('Index')
-    plt.ylabel('Log(Singular Value)')
-    plt.grid(True)
-    plt.legend()
-    
-    plt.tight_layout()
-    plt.show()
-    
-    print(f"Log Fit: Slope = {slope:.2f}, Intercept = {intercept:.2f}, R-squared = {r_value**2:.2f}")
-    return r_value**2  # Coefficient of determination (goodness of fit)
+#         for matrix_type in matrix_types or ["query", "key", "value"]:
+#             if combine_layers:
+#                 # Average across all layers for the given matrix type
+#                 layer_values = [
+#                     coeffs[layer][matrix_type] for layer in svd_entries.keys()
+#                 ]
+#                 avg_value = np.mean(layer_values)
+#                 combined_data[matrix_type].append((x_value, avg_value))
+#             else:
+#                 # Keep values for individual layers
+#                 for layer in layers or svd_entries.keys():
+#                     combined_data[(matrix_type, layer)].append((x_value, coeffs[layer][matrix_type]))
 
-def test_power_relationship(singular_values, layer_name, matrix_name):
-    """
-    Test if there is a power-law relationship between the index and singular values.
-    Plots the log-log relationship and computes a linear fit.
-    """
-    indices = np.arange(1, len(singular_values) + 1)  # Avoid log(0) by starting from 1
-    log_indices = np.log(indices)
-    log_values = np.log(singular_values)
-    
-    # Fit a linear model in log-log space
-    slope, intercept, r_value, p_value, std_err = linregress(log_indices, log_values)
-    
-    # Plot the log-log data
-    plt.figure(figsize=(12, 6))
-    
-    # Log-log plot
-    plt.plot(log_indices, log_values, marker='o', label='Log-Log Transformed')
-    plt.plot(log_indices, intercept + slope * log_indices, label=f'Fit (r={r_value:.2f})', linestyle='--')
-    plt.title(f'Power-Law Relationship ({layer_name} - {matrix_name})')
-    plt.xlabel('Log(Index)')
-    plt.ylabel('Log(Singular Value)')
-    plt.grid(True)
-    plt.legend()
-    
-    plt.tight_layout()
-    plt.show()
-    
-    print(f"Power-Law Fit: Slope = {slope:.2f}, Intercept = {intercept:.2f}, R-squared = {r_value**2:.2f}")
-    return r_value**2  # Coefficient of determination (goodness of fit)
+#     # Plot the data
+#     plt.figure(figsize=(12, 6))
 
+#     if combine_layers:
+#         for matrix_type, values in combined_data.items():
+#             # Ensure x and y values are sorted and aligned
+#             values = sorted(values, key=lambda v: v[0])
+#             x_vals, y_vals = zip(*values)
+
+#             if combine_runs:
+#                 unique_x_vals = sorted(set(x_vals))
+#                 averaged_y_vals = [
+#                     np.mean([y for x, y in values if x == unique_x])
+#                     for unique_x in unique_x_vals
+#                 ]
+#                 x_vals, y_vals = unique_x_vals, averaged_y_vals
+
+#             plt.plot(x_vals, y_vals, marker='o', label=f"{matrix_type} (avg across layers)")
+
+#     else:
+#         for (matrix_type, layer), values in combined_data.items():
+#             # Ensure x and y values are sorted and aligned
+#             values = sorted(values, key=lambda v: v[0])
+#             x_vals, y_vals = zip(*values)
+
+#             if combine_runs:
+#                 unique_x_vals = sorted(set(x_vals))
+#                 averaged_y_vals = [
+#                     np.mean([y for x, y in values if x == unique_x])
+#                     for unique_x in unique_x_vals
+#                 ]
+#                 x_vals, y_vals = unique_x_vals, averaged_y_vals
+
+#             plt.plot(x_vals, y_vals, marker='o', label=f"{matrix_type} - {layer}")
+
+#     plt.xlabel("Number of Classes" if x_axis == "num_classes" else "Validation Accuracy", fontsize=12)
+#     plt.ylabel(f"{coefficient_name.capitalize()} Coefficient", fontsize=12)
+#     plt.title(title, fontsize=16)
+#     plt.legend()
+#     plt.grid(True)
+#     plt.show()
+
+# Example usage
+# plot_coefficients_over_runs(results, "gini", x_axis="num_classes", combine_runs=True, filter_runs=["run_1", "run_2"])
 
 
 
 
 import matplotlib.pyplot as plt
 import numpy as np
-from collections import defaultdict
+from collections import defaultdict, Counter
+from statistics import mode, median
 
-# Function 1: Plot intrinsic dimension coefficients over runs
 def plot_coefficients_over_runs(
     results, 
     coefficient_name, 
@@ -208,6 +138,8 @@ def plot_coefficients_over_runs(
     layers=None, 
     matrix_types=None, 
     combine_runs=True, 
+    combine_layers=False,
+    combine_method="average",
     filter_runs=None, 
     title=None
 ):
@@ -218,22 +150,24 @@ def plot_coefficients_over_runs(
         results (dict): Dictionary containing training run results.
         coefficient_name (str): One of "gini", "elbow", or "energy".
         x_axis (str): X-axis value, either "num_classes" or "best_accuracy".
-        layers (list, optional): List of layers to include. Defaults to all.
-        matrix_types (list, optional): List of matrix types to include. Defaults to all.
-        combine_runs (bool): Whether to average values for runs with the same x-axis value.
-        filter_runs (list, optional): List of run names to include. Defaults to all.
+        layers (list, optional): List of layers to include. Defaults to all layers.
+        matrix_types (list, optional): List of matrix types to include. Defaults to ["query", "key", "value"].
+        combine_runs (bool): Whether to combine values for runs with the same x-axis value.
+        combine_layers (bool): Whether to combine values across all layers for each matrix type.
+        combine_method (str): Method to combine values. Options are "average", "median", or "mode".
+        filter_runs (list, optional): List of run names to include. Defaults to all runs.
         title (str, optional): Custom title for the plot.
 
     Example Usage:
-        # Plot gini coefficients against number of classes
-        plot_coefficients_over_runs(results, "gini", x_axis="num_classes", combine_runs=True)
+        # Plot gini coefficients averaged over layers
+        plot_coefficients_over_runs(results, "gini", combine_layers=True, combine_method="average")
 
-        # Plot energy coefficients for 'layer_3' and 'query' matrix, filtering specific runs
-        plot_coefficients_over_runs(results, "energy", x_axis="best_accuracy", layers=["layer_3"], matrix_types=["query"], filter_runs=["run_1", "run_2"])
+        # Plot energy coefficients for specific layers and matrix types
+        plot_coefficients_over_runs(results, "energy", x_axis="best_accuracy", layers=["layer_3"], matrix_types=["query"], combine_method="median")
     """
-    x_values = defaultdict(list)  # To collect x-axis values for combining
-    y_values = defaultdict(lambda: defaultdict(list))  # To collect y-values
-    
+    # Initialize storage for x and y values
+    combined_data = defaultdict(list)
+
     # Default title
     if not title:
         title = f"{coefficient_name.capitalize()} Coefficient over Runs"
@@ -242,9 +176,13 @@ def plot_coefficients_over_runs(
     filtered_results = {k: v for k, v in results.items() if not filter_runs or k in filter_runs}
 
     for run, data in filtered_results.items():
-        # X-axis value: num_classes or best accuracy
+        # X-axis value: Extract num_classes or best_accuracy
         if x_axis == "num_classes":
-            x_value = int(len(run.split('-')))  # Assuming class count is in the run key
+            try:
+                x_value = int(len(run.split('-')))  # Extract class count from the run name
+            except ValueError:
+                print(f"Warning: Could not parse 'num_classes' for run '{run}'. Skipping.")
+                continue
         elif x_axis == "best_accuracy":
             x_value = data["Metrics"]["Best Results"]["Validation Accuracy"]
         else:
@@ -253,44 +191,77 @@ def plot_coefficients_over_runs(
         # Collect coefficients
         coeffs = data["Coefficients"][coefficient_name]
         svd_entries = data["SVD Diagonal Entries"]
-        
+
         for matrix_type in matrix_types or ["query", "key", "value"]:
-            for layer in layers or svd_entries.keys():
-                x_values[x_value].append(x_value)
-                y_values[matrix_type][layer].append(coeffs[layer][matrix_type])
-
-    # Combine values if specified
-    combined_x = sorted(x_values.keys())
-    combined_y = defaultdict(lambda: defaultdict(list))
-
-    for matrix_type, layers_data in y_values.items():
-        for layer, values in layers_data.items():
-            for x_val, y_val in zip(x_values.keys(), values):
-                if combine_runs:
-                    combined_y[matrix_type][layer].append(np.mean(y_val))
-                else:
-                    combined_y[matrix_type][layer].extend(y_val)
+            if combine_layers:
+                # Combine across all layers for the given matrix type
+                layer_values = [
+                    coeffs[layer][matrix_type] for layer in svd_entries.keys()
+                ]
+                combined_value = combine_values(layer_values, combine_method)
+                combined_data[matrix_type].append((x_value, combined_value))
+            else:
+                # Keep values for individual layers
+                for layer in layers or svd_entries.keys():
+                    combined_data[(matrix_type, layer)].append((x_value, coeffs[layer][matrix_type]))
 
     # Plot the data
     plt.figure(figsize=(12, 6))
-    for matrix_type in combined_y:
-        for layer in combined_y[matrix_type]:
-            print(f"{matrix_type} - {layer}: {combined_x} {combined_y[matrix_type][layer]}")
-            plt.plot(
-                combined_x, combined_y[matrix_type][layer],
-                marker='o',
-                label=f"{matrix_type} - {layer}"
-            )
-    
+
+    if combine_layers:
+        for matrix_type, values in combined_data.items():
+            # Ensure x and y values are sorted and aligned
+            values = sorted(values, key=lambda v: v[0])
+            x_vals, y_vals = zip(*values)
+
+            if combine_runs:
+                x_vals, y_vals = combine_x_values(x_vals, y_vals, combine_method)
+
+            plt.plot(x_vals, y_vals, marker='o', label=f"{matrix_type} (avg across layers)")
+
+    else:
+        for (matrix_type, layer), values in combined_data.items():
+            # Ensure x and y values are sorted and aligned
+            values = sorted(values, key=lambda v: v[0])
+            x_vals, y_vals = zip(*values)
+
+            if combine_runs:
+                x_vals, y_vals = combine_x_values(x_vals, y_vals, combine_method)
+
+            plt.plot(x_vals, y_vals, marker='o', label=f"{matrix_type} - {layer}")
+
     plt.xlabel("Number of Classes" if x_axis == "num_classes" else "Validation Accuracy", fontsize=12)
-    plt.ylabel(f"{coefficient_name.capitalize()} Coefficient", fontsize=12)
+    plt.ylabel(f"{coefficient_name.capitalize()} Coefficient ({combine_method.capitalize()})", fontsize=12)
     plt.title(title, fontsize=16)
     plt.legend()
     plt.grid(True)
     plt.show()
 
-# Example usage
-# plot_coefficients_over_runs(results, "gini", x_axis="num_classes", combine_runs=True, filter_runs=["run_1", "run_2"])
+
+def combine_values(values, method):
+    """Combine a list of values based on the specified method."""
+    if method == "average":
+        return np.mean(values)
+    elif method == "median":
+        return median(values)
+    elif method == "mode":
+        try:
+            return mode(values)
+        except:
+            print("Warning: Mode calculation failed due to no unique mode.")
+            return np.mean(values)  # Fallback to mean
+    else:
+        raise ValueError("Invalid combine_method. Choose from 'average', 'median', or 'mode'.")
+
+
+def combine_x_values(x_vals, y_vals, method):
+    """Combine y-values for the same x-values based on the specified method."""
+    unique_x_vals = sorted(set(x_vals))
+    combined_y_vals = [
+        combine_values([y for x, y in zip(x_vals, y_vals) if x == unique_x], method)
+        for unique_x in unique_x_vals
+    ]
+    return unique_x_vals, combined_y_vals
 
 
 # Function 2: Plot coefficients across layers or runs
@@ -416,5 +387,114 @@ def plot_best_accuracy_vs_classes(results, filter_runs=None, title="Best Accurac
     plt.xlabel("Number of Classes", fontsize=12)
     plt.ylabel("Best Validation Accuracy", fontsize=12)
     plt.grid(True)
+    plt.show()
+
+
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.stats import sem  # For confidence interval
+from collections import defaultdict
+
+def plot_coefficients_with_accuracy(
+    results, 
+    coefficient_name, 
+    accuracies_dict, 
+    layers=None, 
+    combine_matrices=True,
+    title=None,
+    ylabel=None
+):
+    """
+    Plot averaged coefficients with confidence intervals against averaged accuracies.
+
+    Args:
+        results (dict): Dictionary containing training run results.
+        coefficient_name (str): Name of the coefficient ("gini", "elbow", "energy").
+        accuracies_dict (dict): Dictionary where keys are class counts and values are lists of accuracies.
+        layers (list, optional): Layers to include. Defaults to all layers.
+        combine_matrices (bool): If True, averages key, query, and value coefficients. If False, plots them separately.
+        title (str, optional): Title for the plot.
+        ylabel (str, optional): Label for the y-axis. Defaults to the coefficient name.
+
+    Example:
+        accuracies = {10: [0.85, 0.86, 0.87], 20: [0.80, 0.81, 0.82]}
+        plot_coefficients_with_accuracy(results, "gini", accuracies, combine_matrices=False)
+    """
+    # Initialize storage for averaged coefficients
+    valid_class_counts = []
+    mean_accuracies = []
+    coefficients_by_class = defaultdict(lambda: defaultdict(list))  # To store coefficients for each class
+
+    # Step 1: Validate class counts and align them with results
+    for class_count, accuracies in accuracies_dict.items():
+        # Check if this class count exists in results
+        relevant_runs = [run for run in results if len(run.split('-')) == class_count]
+        if relevant_runs:
+            valid_class_counts.append(class_count)
+            mean_accuracies.append(np.mean(accuracies))  # Average accuracies for this class
+            for run in relevant_runs:
+                coeffs = results[run]["Coefficients"][coefficient_name]
+                svd_entries = results[run]["SVD Diagonal Entries"]
+                for matrix_type in ["query", "key", "value"]:
+                    for layer in layers or svd_entries.keys():
+                        coefficients_by_class[class_count][matrix_type].append(coeffs[layer][matrix_type])
+        else:
+            print(f"Warning: No results for class count {class_count}. Skipping it.")
+
+    # Step 2: Compute averaged coefficients and confidence intervals
+    combined_coefficients = []
+    combined_conf_intervals = []
+
+    matrix_coefficients = defaultdict(list)  # For separate query/key/value plotting
+
+    for class_count in valid_class_counts:
+        if combine_matrices:
+            # Combine across all matrix types
+            all_values = []
+            for matrix_type in ["query", "key", "value"]:
+                all_values.extend(coefficients_by_class[class_count][matrix_type])
+            if all_values:
+                combined_coefficients.append(np.mean(all_values))
+                combined_conf_intervals.append(sem(all_values) * 1.96)  # 95% confidence interval
+        else:
+            # Store separately for each matrix type
+            for matrix_type in ["query", "key", "value"]:
+                values = coefficients_by_class[class_count][matrix_type]
+                if values:
+                    matrix_coefficients[matrix_type].append((np.mean(values), sem(values) * 1.96))
+
+    # Step 3: Plotting
+    plt.figure(figsize=(10, 6))
+
+    if combine_matrices:
+        plt.errorbar(
+            mean_accuracies, 
+            combined_coefficients, 
+            yerr=combined_conf_intervals, 
+            fmt='o-', 
+            capsize=5, 
+            label="Combined Coefficients"
+        )
+    else:
+        for matrix_type, data in matrix_coefficients.items():
+            y_means, y_cis = zip(*data)
+            plt.errorbar(
+                mean_accuracies, 
+                y_means, 
+                yerr=y_cis, 
+                fmt='o-', 
+                capsize=5, 
+                label=f"{matrix_type.capitalize()} Coefficients"
+            )
+
+    # Labels and Title
+    plt.xlabel("Mean Validation Accuracy", fontsize=12)
+    plt.ylabel(ylabel if ylabel else f"Average {coefficient_name.capitalize()} Coefficient", fontsize=12)
+    plt.title(title if title else f"{coefficient_name.capitalize()} Coefficient vs Validation Accuracy", fontsize=14)
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+
+    # Show plot
     plt.show()
 
