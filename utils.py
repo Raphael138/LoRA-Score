@@ -4,6 +4,7 @@ from tqdm import tqdm
 import torch
 import numpy as np
 import os
+from scipy.stats import linregress
 
 # Argument Parser
 def parse_args():
@@ -175,7 +176,33 @@ def plot_lora_svd_singular_values(svd_results):
     plt.tight_layout(rect=[0, 0.03, 1, 0.98])
     plt.show()
 
-def plot_histogram(data, bins=10, title='Distribution Histogram', xlabel='Value'):
+def plot_log_lora_svd_singular_values(svd_results):
+    """
+    Plot singular values, with the x-axis as the log index and y-axis as the value of the singular value.
+    One row per layer, columns for matrix types.
+    """
+    num_layers = len(svd_results)
+    matrix_types = ['query', 'key', 'value']
+    
+    # Create figure with one row per layer
+    fig, axes = plt.subplots(num_layers, 3, figsize=(15, 4*num_layers))
+    fig.suptitle('Singular Values in LoRA Weights', fontsize=16)
+    
+    for layer_idx, (layer_key, layer_data) in enumerate(svd_results.items()):
+        for matrix_idx, matrix_name in enumerate(matrix_types):
+            singular_values = np.log(layer_data[matrix_name])
+            
+            # Plot singular values
+            axes[layer_idx, matrix_idx].plot(range(len(singular_values)), singular_values, marker='o')
+            axes[layer_idx, matrix_idx].set_title(f'{layer_key} - {matrix_name} Matrix')
+            axes[layer_idx, matrix_idx].set_xlabel('Index')
+            axes[layer_idx, matrix_idx].set_ylabel('Singular Value')
+    
+    plt.tight_layout(rect=[0, 0.03, 1, 0.98])
+    plt.show()
+
+
+def plot_histogram(data, bins=10, title='Distribution Histogram', xlabel='Value', file_path=None):
     """
     Plot a histogram of floating-point values.
     """
@@ -207,6 +234,11 @@ def plot_histogram(data, bins=10, title='Distribution Histogram', xlabel='Value'
     
     # Adjust layout
     plt.tight_layout()
+
+    if file_path:
+        if not os.path.exists(os.path.dirname(file_path)):
+            os.makedirs(os.path.dirname(file_path))
+        plt.savefig(file_path)
     
     return plt.show()
 
@@ -245,3 +277,73 @@ def gather_metrics(trainer):
     }
 
     return data
+
+def test_log_relationship(singular_values, layer_name, matrix_name):
+    """
+    Test if there is a logarithmic relationship between the index and singular values.
+    Plots the original and log-transformed relationships and computes a linear fit.
+    """
+    indices = np.arange(1, len(singular_values) + 1)  # Avoid log(0) by starting from 1
+    log_values = np.log(singular_values)
+    
+    # Fit a linear model in log space
+    slope, intercept, r_value, p_value, std_err = linregress(indices, log_values)
+    
+    # Plot the original data
+    plt.figure(figsize=(12, 6))
+    
+    # Original plot
+    plt.subplot(1, 2, 1)
+    plt.plot(indices, singular_values, marker='o', label='Original')
+    plt.title(f'Original Singular Values ({layer_name} - {matrix_name})')
+    plt.xlabel('Index')
+    plt.ylabel('Singular Value')
+    plt.grid(True)
+    plt.legend()
+    
+    # Log-transformed plot
+    plt.subplot(1, 2, 2)
+    plt.plot(indices, log_values, marker='o', label='Log-Transformed')
+    plt.plot(indices, intercept + slope * indices, label=f'Fit (r={r_value:.2f})', linestyle='--')
+    plt.title(f'Log Relationship ({layer_name} - {matrix_name})')
+    plt.xlabel('Index')
+    plt.ylabel('Log(Singular Value)')
+    plt.grid(True)
+    plt.legend()
+    
+    plt.tight_layout()
+    plt.show()
+    
+    print(f"Log Fit: Slope = {slope:.2f}, Intercept = {intercept:.2f}, R-squared = {r_value**2:.2f}")
+    return r_value**2  # Coefficient of determination (goodness of fit)
+
+def test_power_relationship(singular_values, layer_name, matrix_name):
+    """
+    Test if there is a power-law relationship between the index and singular values.
+    Plots the log-log relationship and computes a linear fit.
+    """
+    indices = np.arange(1, len(singular_values) + 1)  # Avoid log(0) by starting from 1
+    log_indices = np.log(indices)
+    log_values = np.log(singular_values)
+    
+    # Fit a linear model in log-log space
+    slope, intercept, r_value, p_value, std_err = linregress(log_indices, log_values)
+    
+    # Plot the log-log data
+    plt.figure(figsize=(12, 6))
+    
+    # Log-log plot
+    plt.plot(log_indices, log_values, marker='o', label='Log-Log Transformed')
+    plt.plot(log_indices, intercept + slope * log_indices, label=f'Fit (r={r_value:.2f})', linestyle='--')
+    plt.title(f'Power-Law Relationship ({layer_name} - {matrix_name})')
+    plt.xlabel('Log(Index)')
+    plt.ylabel('Log(Singular Value)')
+    plt.grid(True)
+    plt.legend()
+    
+    plt.tight_layout()
+    plt.show()
+    
+    print(f"Power-Law Fit: Slope = {slope:.2f}, Intercept = {intercept:.2f}, R-squared = {r_value**2:.2f}")
+    return r_value**2  # Coefficient of determination (goodness of fit)
+

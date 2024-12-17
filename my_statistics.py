@@ -75,3 +75,49 @@ def elbow_method_count(singular_values):
     count = elbow_index + 1
     
     return count
+
+def add_intrinsic_dimension_coeffs(results):
+    """
+    Adds intrinsic dimensionality coefficients (Gini, Energy, Elbow) for SVD diagonal entries to the dataset.
+
+    Args:
+        results (dict): Dictionary of runs containing "SVD Diagonal Entries".
+
+    Returns:
+        dict: Updated results dictionary with added "Coefficients".
+    """
+    updated_results = {}
+
+    for run, data in results.items():
+        # Initialize the Coefficients dictionary
+        coefficients = {"gini": {}, "energy": {}, "elbow": {}}
+        
+        svd_entries = data["SVD Diagonal Entries"]  # Singular values
+        
+        # Iterate through layers and matrix types
+        for layer, matrices in svd_entries.items():
+            coefficients["gini"][layer] = {}
+            coefficients["energy"][layer] = {}
+            coefficients["elbow"][layer] = {}
+            
+            for matrix_type, singular_values in matrices.items():
+                # Compute Gini coefficient
+                gini = gini_coefficient(singular_values)
+                
+                # Compute Energy Ratio Test
+                energy_count = energy_ratio_test_count(singular_values, energy_threshold=0.95)
+                
+                # Compute Elbow Method
+                elbow_count = elbow_method_count(singular_values)
+                
+                # Store the results
+                coefficients["gini"][layer][matrix_type] = gini
+                coefficients["energy"][layer][matrix_type] = energy_count
+                coefficients["elbow"][layer][matrix_type] = elbow_count
+        
+        # Add the computed coefficients to the results
+        updated_data = data.copy()
+        updated_data["Coefficients"] = coefficients
+        updated_results[run] = updated_data
+
+    return updated_results
