@@ -1,0 +1,64 @@
+According to ChatGPT this is how we should structure our repo
+
+LoRA-Score/
+│─── data/                   # Raw and processed datasets
+│    ├── arxiv_filtered.csv
+│    ├── arxiv_full.csv
+│
+│─── src/                    # Source code for the project
+│    ├── models/             # Model training scripts
+│    │   ├── bert_model.py
+│    │   ├── vit_model.py
+│    │   ├── __init__.py
+│    │
+│    ├── utils/              # Utility functions
+│    │   ├── data_loader.py  # Load datasets
+│    │   ├── plot_utils.py   # Helper functions for visualizations
+│    │   ├── metric_utils.py # Statistics functions
+│    │   ├── __init__.py
+│    │
+│    ├── training/           # Training scripts
+│    │   ├── train_bert.py
+│    │   ├── train_vit.py
+│    │   ├── __init__.py
+│    │
+│    ├── evaluation/         # Scripts for evaluation and analysis
+│    │   ├── analyze_results.py
+│    │   ├── visualize_results.py
+│    │   ├── __init__.py
+│    │
+│    ├── __init__.py
+│
+│─── notebooks/              # Jupyter notebooks for experiments
+│    ├── BERT.ipynb
+│    ├── ViT.ipynb
+│    ├── final_results.ipynb
+│    ├── visualize.ipynb
+│
+│─── scripts/                # Shell scripts for automation
+│    ├── train_bert_clamped_lora.sh
+│    ├── train_vit_clamped_lora.sh
+│    ├── train_vit_lora.sh
+│
+│─── results/                # Outputs from experiments
+│    ├── images/             # Figures and graphs
+│    │   ├── complexity_proxy.png
+│    │   ├── energy_ratio_graphs.png
+│    │   ├── energy_vs_layers.png
+│    │   ├── shuffle_results.png
+│    │
+│    ├── logs/               # Logs for training runs
+│    ├── metrics/            # JSON or CSV files with experiment results
+│    │   ├── fine-tune_metric_results.json
+│
+│─── reports/                # Research papers and summaries
+│    ├── LoRA_Final_Report.pdf
+│
+│─── tests/                  # Unit tests for the codebase
+│    ├── test_models.py
+│    ├── test_utils.py
+│
+│─── .gitignore
+│─── README.md
+│─── requirements.txt
+│─── setup.py                # If packaging the project
