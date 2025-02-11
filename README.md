@@ -9,18 +9,16 @@ LoRA is an efficient method for fine-tuning large models by introducing low-rank
 ## Key Findings
 - **Task Complexity Proxy**:
   - The number of classes in classification tasks correlates negatively with full fine-tuning accuracy. Thus, we can use the number of classes in classification tasks as a proxy for task complexity.
-
-![Energy Ratio Graph](images/complexity_proxy.png)
-
+![Energy Ratio Graph](results/images/complexity_proxy.png)
 - **Intrinsic Rank Correlation**: The intrinsic rank of LoRA’s adaptation matrices increases as task complexity increases.
-![Energy Ratio Graph](images/energy_ratio_graphs.png)
+![Energy Ratio Graph](results/images/energy_ratio_graphs.png)
 - **Layerwise Trends**:
   - In BERT (text model), the intrinsic rank decreases across layers.
   - In ViTs (vision models), intrinsic rank follows a bell curve, increasing in early layers and decreasing in later layers.
-![Energy Ratio vs Layers](images/energy_vs_layers.png)
+![Energy Ratio vs Layers](results/images/energy_vs_layers.png)
 - **Noise and Memorization**:
   - Introducing label noise increases intrinsic rank, suggesting that LoRA adapts to complexity by allocating more parameters when tasks require memorization.
-![Energy Ratio vs Layers](images/shuffle_results.png)  
+![Energy Ratio vs Layers](results/images/shuffle_results.png)  
 ## Repository Contents
 - `code/` - Contains all scripts and notebooks used for data processing, model training, and analysis.
 - `data/` - Links to datasets used in experiments.
